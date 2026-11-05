@@ -44,7 +44,7 @@ describe('puzzles.json bundle', () => {
         ).toBeTruthy()
       }
     }
-  })
+  }, 30_000) // replays ~1000 puzzles; the 5s default times out on a busy machine
 
   it('covers all rating bands', () => {
     const bands = {
