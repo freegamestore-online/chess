@@ -110,7 +110,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
       setCoaching(msg)
       if (!muted) speech.speak(msg)
     }
-  }, [chess, playerColor, !muted])
+  }, [chess, playerColor, muted])
 
   const makeEngineMove = useCallback(async () => {
     if (chess.isGameOver() || chess.turn() === playerColor) return
@@ -146,7 +146,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
     } finally {
       setThinking(false)
     }
-  }, [chess, playerColor, settings.difficulty, !muted, settings.showCoaching, updateGameStatus])
+  }, [chess, playerColor, settings.difficulty, muted, settings.showCoaching, updateGameStatus])
 
   // After state change, check if engine should move
   useEffect(() => {
@@ -188,7 +188,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
     } catch {
       return false
     }
-  }, [chess, isPlayerTurn, playerColor, settings.showCoaching, !muted, settings.difficulty, updateGameStatus])
+  }, [chess, isPlayerTurn, playerColor, settings.showCoaching, muted, settings.difficulty, updateGameStatus])
 
   const resetGame = useCallback(() => {
     positionGenRef.current++
@@ -203,7 +203,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
     setEvaluation(0)
     setHeardText('')
     if (!muted) speech.speak('New game started.')
-  }, [chess, !muted])
+  }, [chess, muted])
 
   // Roll back the most recent player + engine move pair. Returns true if anything was undone.
   const undoMovePair = useCallback(() => {
@@ -282,7 +282,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
         }
       },
     })
-  }, [chess, isPlayerTurn, playerColor, !muted, settings.showCoaching, settings.microphone, gameStatus, handleMove, resetGame, undoMovePair])
+  }, [chess, isPlayerTurn, playerColor, muted, settings.showCoaching, settings.microphone, gameStatus, handleMove, resetGame, undoMovePair])
 
   // Start/stop voice listening when microphone setting changes
   useEffect(() => {
@@ -316,7 +316,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
     setGameStatus('resigned')
     setCoaching('You resigned.')
     if (!muted) speech.speak('You resigned.')
-  }, [gameStatus, !muted])
+  }, [gameStatus, muted])
 
   const [hintArrow, setHintArrow] = useState<{ from: Square; to: Square } | null>(null)
   const [hintLoading, setHintLoading] = useState(false)
@@ -344,7 +344,9 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
 
   const history = chess.history()
   const boardFlipped = settings.boardFlipped !== (playerColor === 'b')
-  const opening = useMemo(() => findOpening(history), [history.join(' ')])
+  const historyKey = history.join(' ')
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- history is a new array each render; historyKey tracks its content
+  const opening = useMemo(() => findOpening(history), [historyKey])
   const [pgnCopied, setPgnCopied] = useState(false)
   const exportPgn = useCallback(async () => {
     const result =
