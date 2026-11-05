@@ -61,6 +61,9 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
   const [sfReady, setSfReady] = useState(false)
   const listeningRef = useRef(false)
   const voiceRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Bumped whenever the position is changed outside normal play (new game, undo)
+  // so an engine search that was started on the old position is discarded.
+  const positionGenRef = useRef(0)
 
   const playerColor = settings.playerColor
   const isPlayerTurn = chess.turn() === playerColor && gameStatus === 'playing'
@@ -112,17 +115,21 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
   const makeEngineMove = useCallback(async () => {
     if (chess.isGameOver() || chess.turn() === playerColor) return
 
+    const gen = positionGenRef.current
     setThinking(true)
+    try {
+      // Small delay so UI shows "Thinking..."
+      await new Promise(r => setTimeout(r, 100))
+      if (gen !== positionGenRef.current) return
 
-    // Small delay so UI shows "Thinking..."
-    await new Promise(r => setTimeout(r, 100))
+      const useSF = shouldUseStockfish(settings.difficulty)
+      const move = useSF
+        ? await findBestMoveSF(chess, settings.difficulty)
+        : findBestMove(chess, settings.difficulty)
 
-    const useSF = shouldUseStockfish(settings.difficulty)
-    const move = useSF
-      ? await findBestMoveSF(chess, settings.difficulty)
-      : findBestMove(chess, settings.difficulty)
+      // The board was reset or undone while searching: this move is for a stale position.
+      if (!move || gen !== positionGenRef.current) return
 
-    if (move) {
       const played = chess.move(move)
       setFen(chess.fen())
       setLastMove({ from: move.from, to: move.to })
@@ -136,8 +143,9 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
       if (advice && settings.showCoaching) setCoaching(advice)
 
       updateGameStatus()
+    } finally {
+      setThinking(false)
     }
-    setThinking(false)
   }, [chess, playerColor, settings.difficulty, !muted, settings.showCoaching, updateGameStatus])
 
   // After state change, check if engine should move
@@ -183,6 +191,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
   }, [chess, isPlayerTurn, playerColor, settings.showCoaching, !muted, settings.difficulty, updateGameStatus])
 
   const resetGame = useCallback(() => {
+    positionGenRef.current++
     chess.reset()
     setFen(chess.fen())
     setLastMove(null)
@@ -200,6 +209,7 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
   const undoMovePair = useCallback(() => {
     const lenBefore = chess.history().length
     if (lenBefore < 2) return false
+    positionGenRef.current++
     chess.undo()
     chess.undo()
     setFen(chess.fen())
@@ -313,12 +323,13 @@ export function PlayTab({ settings, updateSettings }: PlayTabProps) {
   const requestHint = useCallback(async () => {
     if (!isPlayerTurn || hintLoading) return
     setHintLoading(true)
+    const gen = positionGenRef.current
     try {
       // Prefer Stockfish for stronger hints; fall back to minimax.
       const move = sfReady
         ? await findBestMoveSF(chess, Math.max(settings.difficulty, 3) as Difficulty)
         : findBestMove(chess, Math.max(settings.difficulty, 2) as Difficulty)
-      if (move) setHintArrow({ from: move.from, to: move.to })
+      if (move && gen === positionGenRef.current) setHintArrow({ from: move.from, to: move.to })
     } finally {
       setHintLoading(false)
     }

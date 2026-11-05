@@ -18,7 +18,8 @@ type ListenOptions = {
 class SpeechService {
   private listeners: Listener[] = []
   private recognition: SpeechRecognition | null = null
-  private synthesis = window.speechSynthesis
+  // Undefined in browsers/webviews without Web Speech synthesis; speaking is then a no-op.
+  private synthesis: SpeechSynthesis | undefined = window.speechSynthesis
   private voicesLoaded = false
 
   state: SpeechState = {
@@ -29,6 +30,7 @@ class SpeechService {
   }
 
   constructor() {
+    if (!this.synthesis) return
     if (this.synthesis.getVoices().length > 0) {
       this.voicesLoaded = true
     } else {
@@ -114,13 +116,15 @@ class SpeechService {
   }
 
   speak(text: string, lang = 'en-US'): Promise<void> {
+    const synthesis = this.synthesis
+    if (!synthesis) return Promise.resolve()
     const doSpeak = () => new Promise<void>((resolve) => {
-      this.synthesis.cancel()
+      synthesis.cancel()
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.lang = lang
       utterance.rate = 0.9
 
-      const voices = this.synthesis.getVoices()
+      const voices = synthesis.getVoices()
       const match = voices.find(v => v.lang.startsWith(lang))
       if (match) utterance.voice = match
 
@@ -139,12 +143,12 @@ class SpeechService {
         resolve()
       }
 
-      this.synthesis.speak(utterance)
+      synthesis.speak(utterance)
     })
 
     if (!this.voicesLoaded) {
       return new Promise<void>((resolve) => {
-        this.synthesis.addEventListener('voiceschanged', () => {
+        synthesis.addEventListener('voiceschanged', () => {
           this.voicesLoaded = true
           doSpeak().then(resolve)
         }, { once: true })
@@ -154,7 +158,7 @@ class SpeechService {
   }
 
   stopSpeaking() {
-    this.synthesis.cancel()
+    this.synthesis?.cancel()
     this.state.isSpeaking = false
     this.notify()
   }
