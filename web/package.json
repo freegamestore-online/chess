@@ -12,7 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@freegamestore/games": "^0.14.0",
+    "@freegamestore/games": "^0.20.2",
     "chess.js": "^1.0.0-beta.8",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
